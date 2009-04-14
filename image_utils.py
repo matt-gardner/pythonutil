@@ -1,0 +1,349 @@
+#!/usr/bin/env python
+
+from __future__ import division
+from PIL import Image
+from evilplot import Plot, Histogram
+from numpy import array
+from math import cos, sin, sqrt
+
+def mask_image(image, new_image, mask):
+    width, height = image.size
+    mw, mh = mask.shape
+    for i in range(width):
+        for j in range(height):
+            newpixel = 0
+            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
+                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
+                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
+                        newpixel += image.getpixel((i+x,j+y))\
+                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
+            new_image.putpixel((i,j),newpixel)
+
+def mask_image_and_scale(image, new_image, mask, low, high):
+    width, height = image.size
+    mw, mh = mask.shape
+    pixelmin = float('inf')
+    pixelmax = -float('inf')
+    for i in range(width):
+        for j in range(height):
+            newpixel = 0
+            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
+                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
+                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
+                        newpixel += image.getpixel((i+x,j+y))\
+                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
+            if newpixel < pixelmin:
+                pixelmin = newpixel
+            if newpixel > pixelmax:
+                pixelmax = newpixel
+    offset = pixelmin-low
+    scale = (high-low)/(pixelmax-pixelmin)
+    print high, low
+    print pixelmin, pixelmax
+    print offset, scale
+    for i in range(width):
+        for j in range(height):
+            newpixel = 0
+            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
+                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
+                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
+                        newpixel += image.getpixel((i+x,j+y))\
+                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
+            new_image.putpixel((i,j),(newpixel-offset)*scale)
+
+def two_image_mask_and_operation(image1, image2, new_image, mask, operation):
+    width, height = image.size
+    mw, mh = mask.shape
+    for i in range(width):
+        for j in range(height):
+            newpixel1 = 0
+            newpixel2 = 0
+            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
+                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
+                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
+                        newpixel1 += image1.getpixel((i+x,j+y))\
+                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
+                        newpixel2 += image2.getpixel((i+x,j+y))\
+                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
+            new_image.putpixel((i,j),operation(newpixel1,
+                newpixel2))
+
+def two_masks_and_operation(image, mask1, mask2, new_image, operation):
+    width, height = image.size
+    mw, mh = mask1.shape
+    for i in range(width):
+        for j in range(height):
+            newpixel1 = 0
+            newpixel2 = 0
+            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
+                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
+                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
+                        newpixel1 += image.getpixel((i+x,j+y))\
+                            *mask1[x+(mw+1)/2-1,y+(mh+1)/2-1]
+                        newpixel2 += image.getpixel((i+x,j+y))\
+                            *mask2[x+(mw+1)/2-1,y+(mh+1)/2-1]
+            new_image.putpixel((i,j),operation(newpixel1,
+                newpixel2))
+
+def median_mask(image, new_image, mask):
+    width, height = image.size
+    mw, mh = mask.shape
+    for i in range(width):
+        for j in range(height):
+            pixels = []
+            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
+                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
+                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
+                        pixels.append(image.getpixel((i+x,j+y)))
+            pixels.sort()
+            new_image.putpixel((i,j),pixels[int(len(pixels)/2)])
+
+def scale_image(image, low, high):
+    width, height = image.size
+    pixelmin = float('inf')
+    pixelmax = -float('inf')
+    for i in range(width):
+        for j in range(height):
+            val = image.getpixel((i,j))
+            if val < pixelmin:
+                pixelmin = val
+            if val > pixelmax:
+                pixelmax = val
+    offset = pixelmin-low
+    scale = (high-low)/(pixelmax-pixelmin)
+    for i in range(width):
+        for j in range(height):
+            image.putpixel((i,j),(image.getpixel((i,j))-offset)*scale)
+
+def scale_image_to_new(image, newimage, low, high):
+    width, height = image.size
+    pixelmin = float('inf')
+    pixelmax = -float('inf')
+    for i in range(width):
+        for j in range(height):
+            val = image.getpixel((i,j))
+            if val < pixelmin:
+                pixelmin = val
+            if val > pixelmax:
+                pixelmax = val
+    offset = pixelmin-low
+    scale = (high-low)/(pixelmax-pixelmin)
+    for i in range(width):
+        for j in range(height):
+            newimage.putpixel((i,j),(image.getpixel((i,j))-offset)*scale)
+
+def scale_array_to_image(array, newimage, low=0, high=255):
+    width, height = newimage.size
+    pixelmin = float('inf')
+    pixelmax = -float('inf')
+    for i in range(width):
+        for j in range(height):
+            val = array[i,j]
+            if val < pixelmin:
+                pixelmin = val
+            if val > pixelmax:
+                pixelmax = val
+    offset = pixelmin-low
+    scale = (high-low)/(pixelmax-pixelmin)
+    for i in range(width):
+        for j in range(height):
+            newimage.putpixel((i,j),(array[i,j]-offset)*scale)
+
+def two_image_operation(image1, image2, newimage, operation):
+    width, height = newimage.size
+    for i in range(width):
+        for j in range(height):
+            newimage.putpixel((i,j),operation(image1.getpixel((i,j)),
+                image2.getpixel((i,j))))
+
+def invert_image(image1, newimage, maxpixelval=255):
+    width, height = image1.size
+    for i in range(width):
+        for j in range(height):
+            newimage.putpixel((i,j),maxpixelval-image1.getpixel((i,j)))
+
+def flip_image_indices(i, j, width, height):
+    if i < width/2:
+        newi = i+width/2
+    else:
+        newi = i-width/2
+    if j < height/2:
+        newj = j+height/2
+    else:
+        newj = j-height/2
+    return newi, newj
+
+def resize_image(image, factor):
+    width, height = image.size
+    newwidth = int(width*factor)
+    newheight = int(height*factor)
+    newimage = Image.new(image.mode, (newwidth, newheight))
+    def coords(x,y):
+        return x/factor, y/factor
+    for i in range(newwidth):
+        for j in range(newheight):
+            newimage.putpixel((i,j), bilinear_interpolate(image, *coords(i,j)))
+    return newimage
+
+def rotate_image(image, angle, maxlength=None):
+    width, height = image.size
+    xc = int(width/2)
+    yc = int(height/2)
+    if maxlength is not None:
+        newwidth = int(maxlength)
+        newheight = int(maxlength)
+        xcdiff = int(newwidth/2) - xc
+        ycdiff = int(newheight/2) - yc
+    else:
+        newwidth = width
+        newheight = height
+        xcdiff = 0
+        ycdiff = 0
+    newimage = Image.new(image.mode, (newwidth,newheight))
+    def coords(x,y):
+        tmpx = x-xcdiff
+        tmpy = y-ycdiff
+        newx = (tmpx-xc)*cos(angle)+(tmpy-yc)*sin(angle)+xc
+        newy = (xc-tmpx)*sin(angle)+(tmpy-yc)*cos(angle)+yc
+        return newx, newy
+    for i in range(newwidth):
+        for j in range(newheight):
+            try:
+                value = bilinear_interpolate(image, *coords(i,j))
+            except IndexError:
+                value = 255
+            newimage.putpixel((i,j),value)
+    return newimage
+
+def bilinear_interpolate(image, x, y):
+    width, height = image.size
+    x1 = int(x)
+    x2 = int(x)+1
+    y1 = int(y)
+    y2 = int(y)+1
+    if x2 > width-1 and y2 > height-1:
+        return image.getpixel((x1,y1))
+    if y2 > height-1:
+        f1 = image.getpixel((x1,y1))
+        f2 = image.getpixel((x2,y1))
+        return f1+(x-x1)*(f2-f1)/(x2-x1)
+    if x2 > width-1:
+        f1 = image.getpixel((x1,y1))
+        f2 = image.getpixel((x1,y2))
+        return f1+(y-y1)*(f2-f1)/(y2-y1)
+    denom = (x2-x1)*(y2-y1)
+    f11 = image.getpixel((x1,y1))
+    f12 = image.getpixel((x1,y2))
+    f21 = image.getpixel((x2,y1))
+    f22 = image.getpixel((x2,y2))
+    result = 0
+    result += f11*(x2-x)*(y2-y)
+    result += f12*(x2-x)*(y-y1)
+    result += f21*(x-x1)*(y2-y)
+    result += f11*(x-x1)*(y-y1)
+    return result/denom
+
+def create_residual_image_for_display(image, residual):
+    width, height = image.size
+    for j in range(height):
+        for i in range(width):
+            pixels = []
+            try:
+                pixels.append(image.getpixel((i-1,j)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i-1,j-1)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i,j-1)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i+1,j-1)))
+            except IndexError:
+                pass
+            if len(pixels) == 0:
+                prediction = 0
+            else:
+                prediction = sum(pixels)/len(pixels)
+
+            pixel = image.getpixel((i,j))
+            r = pixel-prediction+128
+            residual.putpixel((i,j),r)
+
+def create_residual_image_for_encoding(image, residual):
+    width, height = image.size
+    for j in range(height):
+        for i in range(width):
+            pixels = []
+            try:
+                pixels.append(image.getpixel((i-1,j)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i-1,j-1)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i,j-1)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i+1,j-1)))
+            except IndexError:
+                pass
+            if len(pixels) == 0:
+                prediction = 0
+            else:
+                prediction = int(sum(pixels)/len(pixels))
+
+            pixel = image.getpixel((i,j))
+            r = (pixel-prediction)%256
+            residual.putpixel((i,j),r)
+
+def reproduce_image_from_residual(residual, image):
+    width, height = residual.size
+    print width, height
+    for j in range(height):
+        for i in range(width):
+            pixels = []
+            try:
+                pixels.append(image.getpixel((i-1,j)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i-1,j-1)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i,j-1)))
+            except IndexError:
+                pass
+            try:
+                pixels.append(image.getpixel((i+1,j-1)))
+            except IndexError:
+                pass
+            if len(pixels) == 0:
+                prediction = 0
+            else:
+                prediction = int(sum(pixels)/len(pixels))
+
+            r = residual.getpixel((i,j))
+            pixel = (prediction+r)%256
+            image.putpixel((i,j),pixel)
+
+def make_histogram(image, filename, numbins=32):
+    width, height = image.size
+    data = []
+    for i in range(width):
+        for j in range(height):
+            pixel = image.getpixel((i,j))
+            data.append(pixel)
+    p = Plot()
+    hist = Histogram(data, numbins)
+    p.append(hist)
+    p.write(filename)
+
+# vim: et sw=4 sts=4
