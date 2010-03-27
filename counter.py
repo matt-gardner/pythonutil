@@ -9,7 +9,6 @@ from __future__ import division
 from heapq import heappush, heappop
 
 class Counter:
-
     def __init__(self):
         self.entries = dict()
 
