@@ -7,6 +7,16 @@ def remove_html_tags(line, htmlsequences):
         newline = newline.replace(sequence, htmlsequences[sequence])
     return newline
 
+def remove_comments(line):
+    import re
+    r = re.compile(r'<!--.*?-->')
+    newline = line
+    match = r.match(newline)
+    while match:
+        newline = newline.replace(newline[match.start():match.end()], '')
+        match = r.match(newline)
+    return newline
+
 def has_html_tags(line, htmlsequences):
     for sequence in htmlsequences:
         if sequence in line:
@@ -50,6 +60,7 @@ def get_html_sequences():
     htmlsequences['&nbsp;'] = u' '
     htmlsequences['&amp;'] = u'&'
     htmlsequences['&ndash;'] = u'–'
+    htmlsequences['&dash;'] = u'-'
     htmlsequences['&hellip;'] = u'…'
     htmlsequences['&bull;'] = u'•'
     htmlsequences['&lsqb;'] = u'['
@@ -61,6 +72,24 @@ def get_html_sequences():
     htmlsequences['&lpar;'] = u'('
     htmlsequences['&rpar;'] = u')'
     htmlsequences['&ast;'] = u'*'
+    htmlsequences['&quest;'] = u'?'
+    htmlsequences['&ulcrop;'] = u'\u230f'
+    htmlsequences['&urcrop;'] = u'\u230e'
+    htmlsequences['&verbar;'] = u'|'
+    # I don't know what these sequences are, but they are here so I can ignore
+    # them in another program I'm writing
+    htmlsequences['&open;'] = u''
+    htmlsequences['&close;'] = u''
+    htmlsequences['&shy;'] = u''
+    htmlsequences['&top;'] = u''
+    htmlsequences['&dot;'] = u''
+    htmlsequences['&ldsqb;'] = u''
+    htmlsequences['&rdsqb;'] = u''
+    htmlsequences['&lang;'] = u''
+    htmlsequences['&num;'] = u''
+    htmlsequences['&rpress;'] = u''
+    htmlsequences['&lpress;'] = u''
+    htmlsequences['&stigma;'] = u''
 
     htmlsequences['&#039;'] = u"'"
     htmlsequences['&#91;'] = u'['
@@ -84,8 +113,5 @@ def get_html_sequences():
     htmlsequences['&#250;'] = u'ú'
 
     return htmlsequences
-
-if __name__ == '__main__':
-    main()
 
 # vim: et sw=4 sts=4
