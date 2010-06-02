@@ -269,49 +269,6 @@ class BernoulliNode(MetropolisNode):
         return self.value
 
 
-class FixedConditionalBernoulliNode(MetropolisNode):
-    def __init__(self, initial_value, name='', parents=None, p=None,
-            observed=False):
-        """This defines a Bernoulli whose p value depends only on whether or
-        not its parents have true or false as their values.  p should be a
-        dictionary of the form {(0, 1) : p} for each case, with the order
-        of the values in the dictionary matching the order of the list of
-        parents."""
-        super(FixedConditionalBernoulliNode, self).__init__(initial_value,
-                name, observed)
-        self.parents = parents
-        for parent in self.parents:
-            parent.children.append(self)
-        self.p = p
-
-    def logconditional(self):
-        case = []
-        for parent in self.parents:
-            case.append(parent.value)
-        case = tuple(case)
-        p = self.p[case].value
-        if self.value == 1:
-            return math.log(p)
-        else:
-            return math.log(1-p)
-
-    def outside_support(self, candidate):
-        return candidate not in [0,1]
-
-    def sample(self):
-        if self.observed:
-            return self.value
-        self.value = 1
-        p = self.loglikelihood()
-        self.value = 0
-        q = self.loglikelihood()
-        u = math.log(random.uniform(0, 1))
-        sum = log_sum(p, q)
-        if u < p - sum:
-            self.value = 1
-        return self.value
-
-
 class BinomialNode(MetropolisNode):
     def __init__(self, initial_value, name='', n=None, p=None, observed=False):
         super(BinomialNode, self).__init__(initial_value, name, observed)
@@ -370,6 +327,25 @@ class SelectorNode(FunctionNode):
     @property
     def value(self):
         return self.choices[self.selector.value].value
+
+
+class TableLookupNode(FunctionNode):
+    def __init__(self, parents, table):
+        self.parents = parents
+        self.table = table
+        self.children = []
+        for parent in self.parents:
+            parent.children.append(self)
+        for k, v in table.items():
+            v.children.append(self)
+
+    @property
+    def value(self):
+        case = []
+        for parent in self.parents:
+            case.append(parent.value)
+        case = tuple(case)
+        return self.table[case].value
     
 
 class AdderNode(FunctionNode):
