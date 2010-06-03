@@ -24,6 +24,23 @@ def sample_generator(*nodes, **kwds):
         yield sample
 
 
+def forward_sample_generator(*nodes, **kwds):
+    print 'Starting the sampler'
+    if 'output_rate' in kwds:
+        output_rate = kwds['output_rate']
+    else:
+        output_rate = 500
+    i = 0
+    while True:
+        i += 1
+        if i%output_rate == 0:
+            print 'Yielding the %dth sample' % i
+        sample = dict()
+        for node in nodes:
+            sample[node.name] = node.sample_given_parents()
+        yield sample
+
+
 class Constant(object):
     def __init__(self, value, name=''):
         self.value = value
@@ -74,6 +91,9 @@ class MetropolisNode(object):
     def density_function(self):
         raise NotImplementedError()
 
+    def sample_given_parents(self):
+        raise NotImplementedError()
+
 
 class NormalNode(MetropolisNode):
     def __init__(self, initial_value, name='', mean=None, var=None,
@@ -103,6 +123,12 @@ class NormalNode(MetropolisNode):
         mean = self.mean.value
         var = self.var.value
         return lambda x: stats.norm.pdf(x, loc=mean, scale=math.sqrt(var))
+
+    def sample_given_parents(self):
+        mean = self.mean.value
+        var = self.var.value
+        self.value = random.normalvariate(mu=mean, sigma=math.sqrt(var))
+        return self.value
 
 
 class NormalNodeNonNegative(MetropolisNode):
@@ -134,6 +160,14 @@ class NormalNodeNonNegative(MetropolisNode):
         mean = self.mean.value
         var = self.var.value
         return lambda x: stats.norm.pdf(x, loc=mean, scale=math.sqrt(var))
+
+    def sample_given_parents(self):
+        mean = self.mean.value
+        var = self.var.value
+        self.value = random.normalvariate(mu=mean, sigma=math.sqrt(var))
+        while self.value < 0:
+            self.value = random.normalvariate(mu=mean, sigma=math.sqrt(var))
+        return self.value
     
 
 class GammaNode(MetropolisNode):
@@ -161,6 +195,12 @@ class GammaNode(MetropolisNode):
         scale = 1/self.inv_scale.value
         return lambda x: stats.gamma.pdf(x, shape, scale=scale)
 
+    def sample_given_parents(self):
+        shape = self.shape.value
+        inv_scale = self.inv_scale.value
+        self.value = random.gammavariate(alpha=shape, beta=inv_scale)
+        return self.value
+
 
 class InvGammaNode(MetropolisNode):
     def __init__(self, initial_value, name='', shape=None, scale=None,
@@ -187,6 +227,12 @@ class InvGammaNode(MetropolisNode):
         scale = self.scale.value
         return lambda x: stats.invgamma.pdf(x, shape, scale=scale)
 
+    def sample_given_parents(self):
+        shape = self.shape.value
+        scale = self.scale.value
+        self.value = stats.invgamma.rvs(shape, scale=scale)
+        return self.value
+
 
 class PoissonNode(MetropolisNode):
     def __init__(self, initial_value, name='', lamda=None, observed=False):
@@ -209,6 +255,10 @@ class PoissonNode(MetropolisNode):
     def density_function(self):
         lamda = self.lamda.value
         return lambda x: stats.poisson.pmf(x, lamda)
+
+    def sample_given_parents(self):
+        self.value = stats.poisson.rvs(self.lamda.value)
+        return self.value
 
 
 class BetaNode(MetropolisNode):
@@ -236,6 +286,10 @@ class BetaNode(MetropolisNode):
         alpha = self.alpha.value
         beta = self.beta.value
         return lambda x: stats.beta.pdf(x, alpha, beta)
+
+    def sample_given_parents(self):
+        self.value = random.betavariate(self.alpha.value, self.beta.value)
+        return self.value
 
 
 class BernoulliNode(MetropolisNode):
@@ -268,6 +322,13 @@ class BernoulliNode(MetropolisNode):
             self.value = 1
         return self.value
 
+    def sample_given_parents(self):
+        u = random.uniform(0,1)
+        self.value = 0
+        if u < self.p.value:
+            self.value = 1
+        return self.value
+
 
 class BinomialNode(MetropolisNode):
     def __init__(self, initial_value, name='', n=None, p=None, observed=False):
@@ -290,15 +351,16 @@ class BinomialNode(MetropolisNode):
         return 0 > candidate or candidate > self.n.value
     
     def sample(self):
-        '''This is wrong!!!  This only samples from the parents, not the 
-        complete conditional.'''
-        raise NotImplementedError('My binomial sampling is broken!')
+        raise NotImplementedError()
+
+    def sample_given_parents(self):
         if self.observed:
             return self.value
         self.value = 0
+        p = self.p.value
         for i in range(self.n.value):
             u = random.uniform(0, 1)
-            if u < self.p.value:
+            if u < p:
                 self.value += 1
         return self.value
 
