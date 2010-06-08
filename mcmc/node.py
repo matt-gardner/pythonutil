@@ -369,12 +369,12 @@ class FunctionNode(MetropolisNode):
     """Nodes that derive from this class simply combine other nodes in various
     ways, like adding, or selecting, or whatever.  Generally these function
     nodes will be created to replace the parameter to one node, so they should
-    only have one child."""
+    only have one child.  However, when they do have more than one child, we
+    assume that it's connected right and just return the sum of the children
+    for the log likelihood calculation, as we normally would."""
 
     def logconditional(self):
-        if len(self.children) != 1:
-            raise ValueError('Something is not connected right...')
-        return self.children[0].logconditional()
+        return sum([c.logconditional() for c in self.children])
 
 
 class SelectorNode(FunctionNode):
