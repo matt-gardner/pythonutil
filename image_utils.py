@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 from __future__ import division
-from PIL import Image
+
+import Image, ImageFilter
+import numpy as np
 from evilplot import Plot, Histogram
-from numpy import array
 from math import cos, sin, sqrt
 
 def mask_image(image, new_image, mask):
@@ -18,6 +19,7 @@ def mask_image(image, new_image, mask):
                         newpixel += image.getpixel((i+x,j+y))\
                             *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
             new_image.putpixel((i,j),newpixel)
+
 
 def mask_image_and_scale(image, new_image, mask, low, high):
     width, height = image.size
@@ -51,6 +53,7 @@ def mask_image_and_scale(image, new_image, mask, low, high):
                             *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
             new_image.putpixel((i,j),(newpixel-offset)*scale)
 
+
 def two_image_mask_and_operation(image1, image2, new_image, mask, operation):
     width, height = image.size
     mw, mh = mask.shape
@@ -67,6 +70,7 @@ def two_image_mask_and_operation(image1, image2, new_image, mask, operation):
                             *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
             new_image.putpixel((i,j),operation(newpixel1,
                 newpixel2))
+
 
 def two_masks_and_operation(image, mask1, mask2, new_image, operation):
     width, height = image.size
@@ -85,6 +89,54 @@ def two_masks_and_operation(image, mask1, mask2, new_image, operation):
             new_image.putpixel((i,j),operation(newpixel1,
                 newpixel2))
 
+
+def grad_magnitude_slow(image):
+    mask1 = np.ones((3,3))
+    mask1[0,0] = -1
+    mask1[0,1] = 0
+    mask1[0,2] = 1
+    mask1[1,0] = -2
+    mask1[1,1] = 0
+    mask1[1,2] = 2
+    mask1[2,0] = -1
+    mask1[2,1] = 0
+    mask1[2,2] = 1
+    mask1 = mask1/8;
+    mask2 = np.ones((3,3))
+    mask2[0,0] = -1
+    mask2[0,1] = -2
+    mask2[0,2] = -1
+    mask2[1,0] = 0
+    mask2[1,1] = 0
+    mask2[1,2] = 0
+    mask2[2,0] = 1
+    mask2[2,1] = 2
+    mask2[2,2] = 1
+    mask2 = mask2/8;
+    def magnitude(p1, p2):
+        return sqrt(p1**2+p2**2)
+    grad_mag = Image.new('L', image.size)
+    two_masks_and_operation(image, mask1, mask2, grad_mag, magnitude)
+    return scale_image(grad_mag, 0, 255)
+
+
+def grad_magnitude(image):
+    array = image2array(image)
+    gradx = convolve_2d(array, np.array((-1, 0, 1)), np.array((1, 2, 1)), 8)
+    grady = convolve_2d(array, np.array((1, 2, 1)), np.array((-1, 0, 1)), 8)
+    arraymag = (gradx**2 + grady**2)**.5
+    return array2image(arraymag)
+
+
+def convolve_2d(array, row_kernel, column_kernel, scale=1):
+    result = array.copy()
+    for r in range(result.shape[0]):
+        result[r,:] = np.convolve(result[r,:], row_kernel, 'same')
+    for c in range(result.shape[1]):
+        result[:,c] = np.convolve(result[:,c], column_kernel, 'same')
+    return result / scale
+
+
 def median_mask(image, new_image, mask):
     width, height = image.size
     mw, mh = mask.shape
@@ -98,39 +150,13 @@ def median_mask(image, new_image, mask):
             pixels.sort()
             new_image.putpixel((i,j),pixels[int(len(pixels)/2)])
 
-def scale_image(image, low, high):
-    width, height = image.size
-    pixelmin = float('inf')
-    pixelmax = -float('inf')
-    for i in range(width):
-        for j in range(height):
-            val = image.getpixel((i,j))
-            if val < pixelmin:
-                pixelmin = val
-            if val > pixelmax:
-                pixelmax = val
-    offset = pixelmin-low
-    scale = (high-low)/(pixelmax-pixelmin)
-    for i in range(width):
-        for j in range(height):
-            image.putpixel((i,j),(image.getpixel((i,j))-offset)*scale)
 
-def scale_image_to_new(image, newimage, low, high):
-    width, height = image.size
-    pixelmin = float('inf')
-    pixelmax = -float('inf')
-    for i in range(width):
-        for j in range(height):
-            val = image.getpixel((i,j))
-            if val < pixelmin:
-                pixelmin = val
-            if val > pixelmax:
-                pixelmax = val
+def scale_image(image, low, high):
+    pixelmin, pixelmax = image.getextrema()
     offset = pixelmin-low
     scale = (high-low)/(pixelmax-pixelmin)
-    for i in range(width):
-        for j in range(height):
-            newimage.putpixel((i,j),(image.getpixel((i,j))-offset)*scale)
+    return image.point(lambda i: i * scale + offset)
+
 
 def scale_array_to_image(array, newimage, low=0, high=255):
     width, height = newimage.size
@@ -149,6 +175,7 @@ def scale_array_to_image(array, newimage, low=0, high=255):
         for j in range(height):
             newimage.putpixel((i,j),(array[i,j]-offset)*scale)
 
+
 def two_image_operation(image1, image2, newimage, operation):
     width, height = newimage.size
     for i in range(width):
@@ -156,11 +183,13 @@ def two_image_operation(image1, image2, newimage, operation):
             newimage.putpixel((i,j),operation(image1.getpixel((i,j)),
                 image2.getpixel((i,j))))
 
+
 def invert_image(image1, newimage, maxpixelval=255):
     width, height = image1.size
     for i in range(width):
         for j in range(height):
             newimage.putpixel((i,j),maxpixelval-image1.getpixel((i,j)))
+
 
 def flip_image_indices(i, j, width, height):
     if i < width/2:
@@ -173,6 +202,7 @@ def flip_image_indices(i, j, width, height):
         newj = j-height/2
     return newi, newj
 
+
 def resize_image(image, factor):
     width, height = image.size
     newwidth = int(width*factor)
@@ -184,6 +214,7 @@ def resize_image(image, factor):
         for j in range(newheight):
             newimage.putpixel((i,j), bilinear_interpolate(image, *coords(i,j)))
     return newimage
+
 
 def rotate_image(image, angle, maxlength=None):
     width, height = image.size
@@ -215,6 +246,7 @@ def rotate_image(image, angle, maxlength=None):
             newimage.putpixel((i,j),value)
     return newimage
 
+
 def bilinear_interpolate(image, x, y):
     width, height = image.size
     x1 = int(x)
@@ -242,6 +274,7 @@ def bilinear_interpolate(image, x, y):
     result += f21*(x-x1)*(y2-y)
     result += f11*(x-x1)*(y-y1)
     return result/denom
+
 
 def create_residual_image_for_display(image, residual):
     width, height = image.size
@@ -273,6 +306,7 @@ def create_residual_image_for_display(image, residual):
             r = pixel-prediction+128
             residual.putpixel((i,j),r)
 
+
 def create_residual_image_for_encoding(image, residual):
     width, height = image.size
     for j in range(height):
@@ -302,6 +336,7 @@ def create_residual_image_for_encoding(image, residual):
             pixel = image.getpixel((i,j))
             r = (pixel-prediction)%256
             residual.putpixel((i,j),r)
+
 
 def reproduce_image_from_residual(residual, image):
     width, height = residual.size
@@ -334,6 +369,7 @@ def reproduce_image_from_residual(residual, image):
             pixel = (prediction+r)%256
             image.putpixel((i,j),pixel)
 
+
 def make_histogram(image, filename, numbins=32):
     width, height = image.size
     data = []
@@ -345,5 +381,27 @@ def make_histogram(image, filename, numbins=32):
     hist = Histogram(data, numbins)
     p.append(hist)
     p.write(filename)
+
+
+def image2array(im):
+    if im.mode not in ("L", "F"):
+        raise ValueError, "can only convert single-layer images"
+    if im.mode == "L":
+        a = np.fromstring(im.tostring(), np.uint8)
+    else:
+        a = np.fromstring(im.tostring(), np.float32)
+    a.shape = im.size[1], im.size[0]
+    return a
+
+
+def array2image(a):
+    if a.dtype == np.uint8:
+        mode = "L"
+    elif a.dtype == np.float32 or a.dtype == np.float64:
+        mode = "F"
+    else:
+        raise ValueError, "unsupported image mode"
+    return Image.fromstring(mode, (a.shape[1], a.shape[0]), a.tostring())
+
 
 # vim: et sw=4 sts=4
