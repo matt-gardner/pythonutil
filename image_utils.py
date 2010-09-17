@@ -2,7 +2,7 @@
 
 from __future__ import division
 
-import Image, ImageFilter
+import Image, ImageFilter, ImageChops
 import numpy as np
 from evilplot import Plot, Histogram
 from math import cos, sin, sqrt
@@ -128,13 +128,31 @@ def grad_magnitude(image):
     gradx = convolve_2d(array, sobelx, 8)
     grady = convolve_2d(array, sobely, 8)
     arraymag = (gradx**2 + grady**2)**.5
-    arraymag = np.frompyfunc(crop_to_value, 2, 1)(arraymag, 128)
+    arraymag = np.frompyfunc(crop, 3, 1)(arraymag, 0., 255.)
     arraymag = scale_array(arraymag, 0, 255)
     return array_to_image(arraymag.astype(np.uint8))
 
 
-def crop_to_value(value, cutoff):
-    return max(-cutoff, min(cutoff, value))
+def color_grad_magnitude(image):
+    red, green, blue = image.split()
+    red_grad_mag = grad_magnitude(red)
+    green_grad_mag = grad_magnitude(green)
+    blue_grad_mag = grad_magnitude(blue)
+    tmp_image = ImageChops.lighter(red_grad_mag, green_grad_mag)
+    return ImageChops.lighter(tmp_image, blue_grad_mag)
+
+
+def threshold_image(image, value):
+    return Image.eval(image, cutoff(value)).convert('1')
+
+
+def crop(value, low, high):
+    return max(low, min(value, high))
+
+
+def cutoff(value):
+    function = lambda x: x if x > value else 0
+    return function
 
 
 def convolve_2d(array, kernel, scale=1):
