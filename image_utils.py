@@ -2,124 +2,10 @@
 
 from __future__ import division
 
-import Image, ImageFilter, ImageChops
+import Image, ImageChops
 import numpy as np
 from evilplot import Plot, Histogram
-from math import cos, sin, sqrt
 from scipy import signal
-
-def mask_image(image, new_image, mask):
-    width, height = image.size
-    mw, mh = mask.shape
-    for i in range(width):
-        for j in range(height):
-            newpixel = 0
-            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
-                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
-                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
-                        newpixel += image.getpixel((i+x,j+y))\
-                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
-            new_image.putpixel((i,j),newpixel)
-
-
-def mask_image_and_scale(image, new_image, mask, low, high):
-    width, height = image.size
-    mw, mh = mask.shape
-    pixelmin = float('inf')
-    pixelmax = -float('inf')
-    for i in range(width):
-        for j in range(height):
-            newpixel = 0
-            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
-                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
-                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
-                        newpixel += image.getpixel((i+x,j+y))\
-                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
-            if newpixel < pixelmin:
-                pixelmin = newpixel
-            if newpixel > pixelmax:
-                pixelmax = newpixel
-    offset = pixelmin-low
-    scale = (high-low)/(pixelmax-pixelmin)
-    print high, low
-    print pixelmin, pixelmax
-    print offset, scale
-    for i in range(width):
-        for j in range(height):
-            newpixel = 0
-            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
-                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
-                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
-                        newpixel += image.getpixel((i+x,j+y))\
-                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
-            new_image.putpixel((i,j),(newpixel-offset)*scale)
-
-
-def two_image_mask_and_operation(image1, image2, new_image, mask, operation):
-    width, height = image.size
-    mw, mh = mask.shape
-    for i in range(width):
-        for j in range(height):
-            newpixel1 = 0
-            newpixel2 = 0
-            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
-                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
-                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
-                        newpixel1 += image1.getpixel((i+x,j+y))\
-                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
-                        newpixel2 += image2.getpixel((i+x,j+y))\
-                            *mask[x+(mw+1)/2-1,y+(mh+1)/2-1]
-            new_image.putpixel((i,j),operation(newpixel1,
-                newpixel2))
-
-
-def two_masks_and_operation(image, mask1, mask2, new_image, operation):
-    width, height = image.size
-    mw, mh = mask1.shape
-    for i in range(width):
-        for j in range(height):
-            newpixel1 = 0
-            newpixel2 = 0
-            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
-                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
-                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
-                        newpixel1 += image.getpixel((i+x,j+y))\
-                            *mask1[x+(mw+1)/2-1,y+(mh+1)/2-1]
-                        newpixel2 += image.getpixel((i+x,j+y))\
-                            *mask2[x+(mw+1)/2-1,y+(mh+1)/2-1]
-            new_image.putpixel((i,j),operation(newpixel1,
-                newpixel2))
-
-
-def grad_magnitude_slow(image):
-    mask1 = np.ones((3,3))
-    mask1[0,0] = -1
-    mask1[0,1] = 0
-    mask1[0,2] = 1
-    mask1[1,0] = -2
-    mask1[1,1] = 0
-    mask1[1,2] = 2
-    mask1[2,0] = -1
-    mask1[2,1] = 0
-    mask1[2,2] = 1
-    mask1 = mask1/8;
-    mask2 = np.ones((3,3))
-    mask2[0,0] = -1
-    mask2[0,1] = -2
-    mask2[0,2] = -1
-    mask2[1,0] = 0
-    mask2[1,1] = 0
-    mask2[1,2] = 0
-    mask2[2,0] = 1
-    mask2[2,1] = 2
-    mask2[2,2] = 1
-    mask2 = mask2/8;
-    def magnitude(p1, p2):
-        return sqrt(p1**2+p2**2)
-    grad_mag = Image.new('L', image.size)
-    two_masks_and_operation(image, mask1, mask2, grad_mag, magnitude)
-    return scale_image(grad_mag, 0, 255)
-
 
 def grad_magnitude(image):
     array = image_to_array(image)
@@ -131,6 +17,30 @@ def grad_magnitude(image):
     arraymag = np.frompyfunc(crop, 3, 1)(arraymag, 0., 255.)
     arraymag = scale_array(arraymag, 0, 255)
     return array_to_image(arraymag.astype(np.uint8))
+
+
+def grad_direction(image):
+    array = image_to_array(image)
+    sobelx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+    sobely = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+    gradx = convolve_2d(array, sobelx, 8)
+    grady = convolve_2d(array, sobely, 8)
+    array_direction = np.arctan2(grady, gradx)
+    array_direction = scale_array(array_direction, 0, 255)
+    return array_to_image(array_direction.astype(np.uint8))
+
+
+def laplacian_image(image):
+    array = image_to_array(image)
+    laplace = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    laplacian = scale_array(convolve_2d(array, laplace, 8), 0, 255)
+    return array_to_image(laplacian.astype(np.uint8))
+
+
+def laplacian_array(image):
+    array = image_to_array(image)
+    laplace = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    return convolve_2d(array, laplace, 8)
 
 
 def color_grad_magnitude(image):
@@ -160,65 +70,18 @@ def convolve_2d(array, kernel, scale=1):
     return result / scale
 
 
-def median_mask(image, new_image, mask):
-    width, height = image.size
-    mw, mh = mask.shape
-    for i in range(width):
-        for j in range(height):
-            pixels = []
-            for x in range(-int((mw-1)/2),int((mw-1)/2+1)):
-                for y in range(-int((mh-1)/2),int((mh-1)/2+1)):
-                    if i+x > 0 and j+y > 0 and i+x < width and j+y < height:
-                        pixels.append(image.getpixel((i+x,j+y)))
-            pixels.sort()
-            new_image.putpixel((i,j),pixels[int(len(pixels)/2)])
-
-
 def scale_image(image, low, high):
     pixelmin, pixelmax = image.getextrema()
     offset = pixelmin-low
     scale = (high-low)/(pixelmax-pixelmin)
-    return image.point(lambda i: i * scale + offset)
+    return image.point(lambda i: (i - offset) * scale)
 
 
 def scale_array(array, low, high):
     minval, maxval = np.min(array), np.max(array)
     offset = minval - low
     scale = (high - low) / (maxval - minval)
-    return array * scale - offset
-
-
-def scale_array_to_image(array, newimage, low=0, high=255):
-    width, height = newimage.size
-    pixelmin = float('inf')
-    pixelmax = -float('inf')
-    for i in range(width):
-        for j in range(height):
-            val = array[i,j]
-            if val < pixelmin:
-                pixelmin = val
-            if val > pixelmax:
-                pixelmax = val
-    offset = pixelmin-low
-    scale = (high-low)/(pixelmax-pixelmin)
-    for i in range(width):
-        for j in range(height):
-            newimage.putpixel((i,j),(array[i,j]-offset)*scale)
-
-
-def two_image_operation(image1, image2, newimage, operation):
-    width, height = newimage.size
-    for i in range(width):
-        for j in range(height):
-            newimage.putpixel((i,j),operation(image1.getpixel((i,j)),
-                image2.getpixel((i,j))))
-
-
-def invert_image(image1, newimage, maxpixelval=255):
-    width, height = image1.size
-    for i in range(width):
-        for j in range(height):
-            newimage.putpixel((i,j),maxpixelval-image1.getpixel((i,j)))
+    return (array - offset) * scale
 
 
 def flip_image_indices(i, j, width, height):
@@ -231,50 +94,6 @@ def flip_image_indices(i, j, width, height):
     else:
         newj = j-height/2
     return newi, newj
-
-
-def resize_image(image, factor):
-    width, height = image.size
-    newwidth = int(width*factor)
-    newheight = int(height*factor)
-    newimage = Image.new(image.mode, (newwidth, newheight))
-    def coords(x,y):
-        return x/factor, y/factor
-    for i in range(newwidth):
-        for j in range(newheight):
-            newimage.putpixel((i,j), bilinear_interpolate(image, *coords(i,j)))
-    return newimage
-
-
-def rotate_image(image, angle, maxlength=None):
-    width, height = image.size
-    xc = int(width/2)
-    yc = int(height/2)
-    if maxlength is not None:
-        newwidth = int(maxlength)
-        newheight = int(maxlength)
-        xcdiff = int(newwidth/2) - xc
-        ycdiff = int(newheight/2) - yc
-    else:
-        newwidth = width
-        newheight = height
-        xcdiff = 0
-        ycdiff = 0
-    newimage = Image.new(image.mode, (newwidth,newheight))
-    def coords(x,y):
-        tmpx = x-xcdiff
-        tmpy = y-ycdiff
-        newx = (tmpx-xc)*cos(angle)+(tmpy-yc)*sin(angle)+xc
-        newy = (xc-tmpx)*sin(angle)+(tmpy-yc)*cos(angle)+yc
-        return newx, newy
-    for i in range(newwidth):
-        for j in range(newheight):
-            try:
-                value = bilinear_interpolate(image, *coords(i,j))
-            except IndexError:
-                value = 255
-            newimage.putpixel((i,j),value)
-    return newimage
 
 
 def bilinear_interpolate(image, x, y):
