@@ -6,6 +6,7 @@ import Image, ImageFilter
 import numpy as np
 from evilplot import Plot, Histogram
 from math import cos, sin, sqrt
+from scipy import signal
 
 def mask_image(image, new_image, mask):
     width, height = image.size
@@ -121,19 +122,23 @@ def grad_magnitude_slow(image):
 
 
 def grad_magnitude(image):
-    array = image2array(image)
-    gradx = convolve_2d(array, np.array((-1, 0, 1)), np.array((1, 2, 1)), 8)
-    grady = convolve_2d(array, np.array((1, 2, 1)), np.array((-1, 0, 1)), 8)
+    array = image_to_array(image)
+    sobelx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+    sobely = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+    gradx = convolve_2d(array, sobelx, 8)
+    grady = convolve_2d(array, sobely, 8)
     arraymag = (gradx**2 + grady**2)**.5
-    return array2image(arraymag)
+    arraymag = np.frompyfunc(crop_to_value, 2, 1)(arraymag, 128)
+    arraymag = scale_array(arraymag, 0, 255)
+    return array_to_image(arraymag.astype(np.uint8))
 
 
-def convolve_2d(array, row_kernel, column_kernel, scale=1):
-    result = array.copy()
-    for r in range(result.shape[0]):
-        result[r,:] = np.convolve(result[r,:], row_kernel, 'same')
-    for c in range(result.shape[1]):
-        result[:,c] = np.convolve(result[:,c], column_kernel, 'same')
+def crop_to_value(value, cutoff):
+    return max(-cutoff, min(cutoff, value))
+
+
+def convolve_2d(array, kernel, scale=1):
+    result = signal.convolve2d(array, kernel, 'same')
     return result / scale
 
 
@@ -156,6 +161,13 @@ def scale_image(image, low, high):
     offset = pixelmin-low
     scale = (high-low)/(pixelmax-pixelmin)
     return image.point(lambda i: i * scale + offset)
+
+
+def scale_array(array, low, high):
+    minval, maxval = np.min(array), np.max(array)
+    offset = minval - low
+    scale = (high - low) / (maxval - minval)
+    return array * scale - offset
 
 
 def scale_array_to_image(array, newimage, low=0, high=255):
@@ -383,7 +395,7 @@ def make_histogram(image, filename, numbins=32):
     p.write(filename)
 
 
-def image2array(im):
+def image_to_array(im):
     if im.mode not in ("L", "F"):
         raise ValueError, "can only convert single-layer images"
     if im.mode == "L":
@@ -394,7 +406,7 @@ def image2array(im):
     return a
 
 
-def array2image(a):
+def array_to_image(a):
     if a.dtype == np.uint8:
         mode = "L"
     elif a.dtype == np.float32 or a.dtype == np.float64:
