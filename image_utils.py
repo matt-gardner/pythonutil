@@ -43,6 +43,16 @@ def laplacian_array(image):
     return convolve_2d(array, laplace, 8)
 
 
+def color_laplacian_array(image):
+    red, green, blue = image.split()
+    red_laplace = laplacian_array(red)
+    green_laplace = laplacian_array(green)
+    blue_laplace = laplacian_array(blue)
+    result = np.frompyfunc(combine_laplacian, 3, 1)(red_laplace, green_laplace,
+            blue_laplace)
+    return result
+
+
 def color_grad_magnitude(image):
     red, green, blue = image.split()
     red_grad_mag = grad_magnitude(red)
@@ -54,6 +64,17 @@ def color_grad_magnitude(image):
 
 def threshold_image(image, value):
     return Image.eval(image, cutoff(value)).convert('1')
+
+
+def combine_laplacian(red, green, blue):
+    mag = map(abs, [red, green, blue])
+    max = 0
+    index = 0
+    for i in range(len(mag)):
+        if mag[i] > max:
+            max = mag[i]
+            index = i
+    return [red, green, blue][index]
 
 
 def crop(value, low, high):
