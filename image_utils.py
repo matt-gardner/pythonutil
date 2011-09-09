@@ -118,6 +118,17 @@ def flip_image_indices(i, j, width, height):
 
 
 def bilinear_interpolate(image, x, y):
+    if image.mode == 'RGB':
+        red, green, blue = image.split()
+        red_val = int(single_channel_interpolate(red, x, y))
+        green_val = int(single_channel_interpolate(green, x, y))
+        blue_val = int(single_channel_interpolate(blue, x, y))
+        return (red_val, green_val, blue_val)
+    else:
+        return single_channel_interpolate(image, x, y)
+
+
+def single_channel_interpolate(image, x, y):
     width, height = image.size
     x1 = int(x)
     x2 = int(x)+1
