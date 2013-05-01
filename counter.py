@@ -1,12 +1,47 @@
 #!/usr/bin/env python
 
-# A Counter class.  Basically it's a map with some convenient
-# features.  It's based off of a java class written by Dan
-# Klein for the Berkeley NLP group.  I didn't implement
-# everything he did - I might later.  Add things as needed.
-
 from __future__ import division
 from heapq import heappush, heappop
+
+class Index(object):
+    def __init__(self):
+        self.strings = dict()
+        # Confusing, maybe, but I would like this to be 1-indexed, not
+        # 0-indexed
+        self.array = [-1]
+        self.current_index = 1
+
+    def getIndex(self, string, _force_add=False):
+        if not _force_add:
+            index = self.strings.get(string, None)
+            if index:
+                return index
+        self.strings[string] = self.current_index
+        self.array.append(string)
+        self.current_index += 1
+        return self.current_index - 1
+
+    def getString(self, index):
+        return self.array[index]
+
+    def save_to_file(self, f):
+        for i, string in enumerate(self.array):
+            if i == 0: continue
+            f.write('%d\t%s\n' % (i, string))
+
+    @classmethod
+    def read_from_file(cls, f):
+        """Initialize an index object from a file.  Assumes file was written by
+        the save_to_file method, so the."""
+        index = cls()
+        for line in f:
+            _, string = line.strip().split('\t')
+            index.getIndex(string, _force_add=True)
+        return index
+
+# A Counter class.  Basically it's a map with some convenient features.  It's
+# based off of a java class written by Dan Klein for the Berkeley NLP group.  I
+# didn't implement everything he did - I might later.  Add things as needed.
 
 class Counter:
     def __init__(self):
@@ -112,7 +147,7 @@ class CounterMap:
     def isEmpty(self):
         return self.size() == 0
 
-    
+
 
 
 # vim: et sw=4 sts=4
