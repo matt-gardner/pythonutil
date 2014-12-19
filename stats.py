@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from __future__ import division
-from copy import copy
 
 def entropy(dist):
     """Finds the entropy of a categorical distribution (with a natural log).
@@ -52,7 +51,7 @@ def mean_permutation_test(data1, data2, num_samples=None):
     return n/num_samples
 
 
-def paired_permutation_test(data1, data2):
+def paired_permutation_test(data1, data2, weights=None):
     """Performs an exact a paired permutation test.
 
     We create an array of the signed difference between the two data points,
@@ -63,8 +62,14 @@ def paired_permutation_test(data1, data2):
     if len(data1) != len(data2):
         raise ValueError('This is a _paired_ test and you gave me data with'
                 ' unequal lengths!')
+    if weights and len(weights) != len(data1):
+        raise ValueError("You passed weights that don't match the data")
     from itertools import izip
     diffs = [x-y for x,y in izip(data1, data2)]
+    if weights:
+        total_weight = sum(weights)
+        for i in range(len(diffs)):
+            diffs[i] = diffs[i] * weights[i] / total_weight
     length = len(diffs)
     mean_diff = abs(sum(diffs)/length)
     n = 0

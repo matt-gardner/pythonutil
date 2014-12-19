@@ -24,6 +24,9 @@ class Index(object):
     def getString(self, index):
         return self.array[index]
 
+    def getAllStrings(self):
+        return self.array[1:]
+
     def save_to_file(self, f):
         for i, string in enumerate(self.array):
             if i == 0: continue
@@ -34,8 +37,14 @@ class Index(object):
         """Initialize an index object from a file.  Assumes file was written by
         the save_to_file method, so the."""
         index = cls()
+        if type(f) == str:
+            f = open(f)
         for line in f:
-            _, string = line.strip().split('\t')
+            try:
+                _, string = line.strip().split('\t')
+            except ValueError:
+                print 'Offending line:', line
+                raise
             index.getIndex(string, _force_add=True)
         return index
 

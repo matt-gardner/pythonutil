@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+print """dirutil is DEPRECATED.  Use fileutil instead."""
+
 def create_dirs_and_open(filename):
     """This assumes that you want to open the file for writing.  It doesn't
     make much sense to create directories if you are not going to open for
