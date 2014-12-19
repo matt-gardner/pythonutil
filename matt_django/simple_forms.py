@@ -3,6 +3,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django import forms
 
+from collections import namedtuple
 
 def add_url_to_data(data, varname, link):
     Url = namedtuple('Url', ['varname', 'link'])
